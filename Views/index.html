@@ -1,0 +1,73 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Архив - Главная</title>
+    <style>
+        body { font-family: ursive, cursive; margin: 40px; }
+        h1 { color: #333; }
+        .menu { margin: 20px 0; }
+        .menu a {
+            display: inline-block;
+            margin-right: 15px;
+            padding: 10px 15px;
+            background: #538f46;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        .menu a:hover { background: #d02f66; }
+        .form-group { margin: 15px 0; }
+        label { display: block; margin-bottom: 5px; }
+        input, textarea {
+            width: 300px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background: #218838; }
+    </style>
+</head>
+<body>
+<h1>Архив документов</h1>
+
+<div class="menu">
+    <a href="/">Главная</a>
+    <a href="/status">Состояние архива</a>
+</div>
+
+<h2>Добавить новый документ</h2>
+<form method="post" action="/action">
+    <div class="form-group">
+        <label for="title">Название документа:</label>
+        <input type="text" id="title" name="title" required>
+    </div>
+
+    <div class="form-group">
+        <label for="description">Описание:</label>
+        <textarea id="description" name="description" rows="3"></textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="filename">Имя файла:</label>
+        <input type="text" id="filename" name="filename" required>
+    </div>
+
+    <div class="form-group">
+        <label for="category">Категория:</label>
+        <input type="text" id="category" name="category" placeholder="Приказы, Договоры, Отчеты...">
+    </div>
+
+    <button type="submit">Добавить в архив</button>
+</form>
+</body>
+</html>
