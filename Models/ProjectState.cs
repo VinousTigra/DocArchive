@@ -13,7 +13,8 @@ public class ProjectState
     
     public void AddDocument(Document document)
     {
-        document.Id = _nextId++;
+        int newId = Interlocked.Increment(ref _nextId);
+        document.Id = newId;
         _documents[document.Id] = document;
         LastUpdate = DateTime.Now;
     }
@@ -36,5 +37,26 @@ public class ProjectState
         return _documents.Values
             .Where(d => d.Category.Equals(category, StringComparison.OrdinalIgnoreCase))
             .ToList();
+    }
+}
+
+
+public class Document
+{
+    public int Id { get; set; }
+    public string Title { get; set; }
+    public string Description { get; set; }
+    public string FileName { get; set; }
+    public DateTime UploadDate { get; set; }
+    public string Category { get; set; }
+    
+    // Используем современный синтаксис инициализации
+    public Document(string title, string description, string fileName, string category)
+    {
+        Title = title;
+        Description = description;
+        FileName = fileName;
+        Category = category;
+        UploadDate = DateTime.Now;
     }
 }

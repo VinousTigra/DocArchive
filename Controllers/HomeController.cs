@@ -1,7 +1,7 @@
 ﻿namespace DocArhive.Controllers;
 
 using System.Text;
-using DocArhive.Models;
+using Models;
 
 public class HomeController
 {

@@ -1,9 +1,8 @@
 ﻿namespace DocArhive;
 
 using System.Net;
-using System.Web;
-using DocArhive.Controllers;
-using DocArhive.Models;
+using Controllers;
+using Models;
 
 public class Router
 {
