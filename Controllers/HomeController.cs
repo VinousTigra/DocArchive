@@ -1,8 +1,4 @@
-﻿using System;
-using System.IO;
-using System.Linq;
-
-namespace DocArhive.Controllers;
+﻿namespace DocArhive.Controllers;
 
 using System.Text;
 using Models;
@@ -74,7 +70,7 @@ public class HomeController
                 </style>
             </head>
             <body>
-                <h1>Электронный архив документов</h1>
+                <h1>Архив документов</h1>
                 <a href="/">Главная</a>
                 <a href="/status">Состояние архива</a>
                 <h2>Добавить новый документ</h2>

@@ -2,12 +2,21 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Архив - Главная</title>
     <style>
-        body { font-family: ursive, cursive; margin: 40px; }
-        h1 { color: #333; }
-        .menu { margin: 20px 0; }
+        body {
+            font-family: ursive, cursive;
+            margin: 40px;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .menu {
+            margin: 20px 0;
+        }
+
         .menu a {
             display: inline-block;
             margin-right: 15px;
@@ -17,24 +26,39 @@
             text-decoration: none;
             border-radius: 4px;
         }
-        .menu a:hover { background: #d02f66; }
-        .form-group { margin: 15px 0; }
-        label { display: block; margin-bottom: 5px; }
+
+        .menu a:hover {
+            background: #d02f66;
+        }
+
+        .form-group {
+            margin: 15px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
         input, textarea {
             width: 300px;
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
         }
+
         button {
             padding: 10px 20px;
-            background: #28a745;
+            background: #538f46;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
         }
-        button:hover { background: #218838; }
+
+        button:hover {
+            background: #538f46;
+        }
     </style>
 </head>
 <body>
@@ -67,7 +91,14 @@
         <input type="text" id="category" name="category" placeholder="Приказы, Договоры, Отчеты...">
     </div>
 
-    <button type="submit">Добавить в архив</button>
+    <button type="submit" style="background-color: #538f46; font-family: ursive, cursive; color: white; padding: 12px 25px;
+     border: none; border-radius: 4px; cursor: pointer; font-size: 16px; width: 325px; 
+     transition: background-color 0.3s;"
+            onmouseover="this.style.backgroundColor='#d02f66'"
+            onmouseout="this.style.backgroundColor='#538f46'">
+        Добавить в архив
+    </button>
+
 </form>
 </body>
 </html>
