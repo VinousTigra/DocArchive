@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
+﻿#nullable enable
 
 namespace DocArhive.Models;
 
@@ -45,7 +42,6 @@ public class ProjectState
     }
 }
 
-
 public class Document
 {
     public int Id { get; set; }
@@ -55,13 +51,19 @@ public class Document
     public DateTime UploadDate { get; set; }
     public string Category { get; set; }
     
-    // Используем современный синтаксис инициализации
-    public Document(string title, string description, string fileName, string category)
+    public Document(string title, string? description, string fileName, string? category)
     {
+        // Добавляем валидацию
+        if (string.IsNullOrWhiteSpace(title))
+            throw new ArgumentException("Title cannot be null, empty or whitespace.", nameof(title));
+            
+        if (string.IsNullOrWhiteSpace(fileName))
+            throw new ArgumentException("FileName cannot be null, empty or whitespace.", nameof(fileName));
+        
         Title = title;
-        Description = description;
+        Description = description ?? string.Empty; // Делаем опциональным
         FileName = fileName;
-        Category = category;
+        Category = category ?? "Без категории"; // Делаем опциональным
         UploadDate = DateTime.Now;
     }
 }

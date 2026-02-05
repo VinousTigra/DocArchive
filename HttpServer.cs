@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading.Tasks;
+﻿#nullable enable
 
 namespace DocArhive;
 
@@ -133,23 +130,24 @@ public class HttpServer
             return null;
         }
     }
-
     private static async Task SendResponseAsync(NetworkStream stream, HttpResponse response)
     {
-        await using var writer = new StreamWriter(stream, Encoding.UTF8);
-        writer.AutoFlush = true;
-
-        // Статусная строка
-        await writer.WriteLineAsync($"HTTP/1.1 {response.StatusCode} {response.StatusMessage}");
-
-        // Заголовки
-        await writer.WriteLineAsync($"Content-Type: {response.ContentType}");
-        await writer.WriteLineAsync($"Content-Length: {Encoding.UTF8.GetByteCount(response.Content)}");
-        await writer.WriteLineAsync("Connection: close");
-        await writer.WriteLineAsync();
-
-        // Тело ответа
-        await writer.WriteAsync(response.Content);
+        // Используем кодировку без BOM (Byte Order Mark)
+        var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+    
+        // Формируем полный ответ как строку
+        var responseString = 
+            $"HTTP/1.1 {response.StatusCode} {response.StatusMessage}\r\n" +
+            $"Content-Type: {response.ContentType}\r\n" +
+            $"Content-Length: {encoding.GetByteCount(response.Content)}\r\n" +
+            "Connection: close\r\n" +
+            "\r\n" +
+            response.Content;
+    
+        // Преобразуем в байты и отправляем напрямую
+        var responseBytes = encoding.GetBytes(responseString);
+        await stream.WriteAsync(responseBytes.AsMemory(0, responseBytes.Length));
+        await stream.FlushAsync();
     }
 }
 
