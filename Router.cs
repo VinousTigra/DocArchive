@@ -1,4 +1,7 @@
-﻿namespace DocArhive;
+﻿using System;
+using System.Collections.Generic;
+
+namespace DocArhive;
 
 using System.Net;
 using Controllers;

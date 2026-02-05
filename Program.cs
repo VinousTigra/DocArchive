@@ -1,4 +1,5 @@
-﻿using DocArhive;
+﻿using System;
+using DocArhive;
 
 Console.WriteLine("Запуск веб-сервера электронного архива...");
 
