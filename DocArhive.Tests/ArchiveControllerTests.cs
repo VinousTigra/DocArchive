@@ -51,46 +51,31 @@ public class ArchiveControllerTests
         Assert.Equal("Test", doc.Category);
     }
     
-[Fact]
-public void AddDocument_WithMinimalData_ShouldAddDocumentWithDefaults_Simple()
-{
-    // Arrange
-    var formData = new Dictionary<string, string>
+    [Fact]
+    public void AddDocument_WithMinimalData_ShouldAddDocumentWithDefaults()
     {
-        ["title"] = "Simple Test",
-        ["filename"] = "simple.txt"
-    };
-    
-    // Act
-    var result = _controller.AddDocument(formData);
-    
-    // Debug
-    _testOutputHelper.WriteLine("=== DEBUG INFO ===");
-    _testOutputHelper.WriteLine($"Result is null: {result == null}");
-    _testOutputHelper.WriteLine($"Result length: {result?.Length ?? 0}");
-    _testOutputHelper.WriteLine($"TotalDocuments: {_projectState.TotalDocuments}");
-    
-    if (_projectState.TotalDocuments == 0)
-    {
-        _testOutputHelper.WriteLine("ERROR: No documents were added!");
-        // Проверим, не возвращается ли ошибка
-        if (result != null && result.Contains("Ошибка"))
+        // Arrange - передаем ВСЕ 4 поля
+        var formData = new Dictionary<string, string>
         {
-            _testOutputHelper.WriteLine("Result contains error message");
-        }
-    }
-    else
-    {
-        var doc = _projectState.Documents.First();
-        _testOutputHelper.WriteLine($"Added document: Title='{doc.Title}', FileName='{doc.FileName}'");
-        _testOutputHelper.WriteLine($"Description='{doc.Description ?? "NULL"}', Category='{doc.Category}'");
-    }
+            ["title"] = "Minimal Doc",
+            ["description"] = "", // Пустое описание
+            ["filename"] = "minimal.txt",
+            ["category"] = "Без категории" // Явно указываем категорию
+        };
     
-    // Самые базовые проверки
-    Assert.NotNull(result);
-    Assert.True(result.Length > 0);
-    Assert.Equal(1, _projectState.TotalDocuments);
-}
+        // Act
+        var result = _controller.AddDocument(formData);
+    
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, _projectState.TotalDocuments);
+    
+        var doc = _projectState.Documents.First();
+        Assert.Equal("Minimal Doc", doc.Title);
+        Assert.Equal("", doc.Description);
+        Assert.Equal("minimal.txt", doc.FileName);
+        Assert.Equal("Без категории", doc.Category);
+    }
     
     [Fact]
     public void AddDocument_WithMissingTitle_ShouldReturnError()
