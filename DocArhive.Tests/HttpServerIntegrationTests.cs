@@ -11,8 +11,6 @@ public class HttpServerIntegrationTests : IDisposable
 {
     private readonly HttpServer _server;
     private readonly Thread _serverThread;
-    private readonly string _baseUrl = "http://127.0.0.1:8081";
-    
     public HttpServerIntegrationTests()
     {
         _server = new HttpServer("127.0.0.1", 8081);
@@ -64,7 +62,7 @@ public class HttpServerIntegrationTests : IDisposable
         var successes = 0;
         var failures = 0;
         
-        for (int i = 0; i < 3; i++) // Уменьшим до 3 для надежности
+        for (int i = 0; i < 3; i++) 
         {
             tasks.Add(Task.Run(async () =>
             {
@@ -115,7 +113,7 @@ public class HttpServerIntegrationTests : IDisposable
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
     
-    // Альтернативный тест с использованием HttpListener (более надежный)
+    // Альтернативный тест с использованием HttpListener
     [Fact]
     public async Task Server_ShouldProcessHttpRequests_Correctly()
     {

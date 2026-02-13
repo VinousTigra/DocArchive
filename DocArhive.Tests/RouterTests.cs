@@ -63,18 +63,13 @@ public class RouterTests
         _testOutputHelper.WriteLine($"Response Content Length: {response.Content.Length}");
         _testOutputHelper.WriteLine($"Response Content: {response.Content}");
     
-        // Самые базовые проверки
         Assert.Equal(200, response.StatusCode);
-        Assert.True(response.Content.Length > 10); // Должен быть какой-то контент
+        Assert.True(response.Content.Length > 10); 
     }
     [Fact]
     public void Route_WhenExceptionThrown_ShouldReturn500()
     {
-        // Arrange
-        // Создаем специальный Router с контроллерами, которые бросают исключение
-        // Для этого нужно создать наследник HomeController с переопределенным методом
-        
-        // Вместо сложного мокирования, просто тестируем обработку исключений в самом Router
+        // тестируем обработку исключений в самом Router
         var request = new HttpRequest
         {
             Method = "GET",
@@ -83,7 +78,6 @@ public class RouterTests
             Body = ""
         };
         
-        // Act - здесь исключение не должно бросаться, но если бы бросалось, оно было бы обработано
         var response = _router.Route(request);
         
         // Assert - проверяем, что роутер не падает на исключениях
@@ -92,7 +86,7 @@ public class RouterTests
         response.StatusCode.Should().Be(404);
     }
     
-    // Исправленный тест на исключение
+    // Тест на исключение
     [Fact]
     public void Router_ShouldHandleControllerExceptionsGracefully()
     {

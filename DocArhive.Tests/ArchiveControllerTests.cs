@@ -66,7 +66,7 @@ public class ArchiveControllerTests
         Assert.Contains("обязательны", result);
     }
     
-    // Тест 3: Добавление документа без имени файла (должно быть ошибка)
+    // Тест 3: Добавление документа без имени файла
     [Fact]
     public void AddDocument_WithoutFilename_ShouldReturnError()
     {

@@ -53,7 +53,6 @@ public class Document
     
     public Document(string title, string? description, string fileName, string? category)
     {
-        // Добавляем валидацию
         if (string.IsNullOrWhiteSpace(title))
             throw new ArgumentException("Title cannot be null, empty or whitespace.", nameof(title));
             
@@ -61,9 +60,9 @@ public class Document
             throw new ArgumentException("FileName cannot be null, empty or whitespace.", nameof(fileName));
         
         Title = title;
-        Description = description ?? string.Empty; // Делаем опциональным
+        Description = description ?? string.Empty; 
         FileName = fileName;
-        Category = category ?? "Без категории"; // Делаем опциональным
+        Category = category ?? "Без категории"; 
         UploadDate = DateTime.Now;
     }
 }

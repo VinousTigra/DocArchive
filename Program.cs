@@ -1,7 +1,6 @@
-﻿using System;
-using DocArhive;
+﻿using DocArhive;
 
-Console.WriteLine("Запуск веб-сервера электронного архива...");
+Console.WriteLine("Запуск...");
 
 var server = new HttpServer("127.0.0.1", 8080);
 

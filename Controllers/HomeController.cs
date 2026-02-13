@@ -44,7 +44,7 @@ public class HomeController
     {
         var filePath = Path.Combine(_viewsPath, fileName);
 
-        Console.WriteLine($"Ищу файл: {filePath}");
+        Console.WriteLine($"Поиск файла: {filePath}");
 
         if (File.Exists(filePath))
         {
@@ -106,8 +106,6 @@ public class HomeController
         }
 
         var html = template
-            .Replace("{{total_documents}}", _state.TotalDocuments.ToString())
-            .Replace("{{last_update}}", _state.LastUpdate.ToString("yyyy-MM-dd HH:mm:ss"))
             .Replace("{{documents_list}}", documentsHtml.ToString());
 
         return html;
