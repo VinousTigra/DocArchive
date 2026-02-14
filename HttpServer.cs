@@ -1,168 +1,140 @@
 ﻿#nullable enable
 
-namespace DocArhive;
-
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
-using Models;
+using DocArhive.Models;
 
-public class HttpServer
+namespace DocArhive;
+
+public class HttpServer : IDisposable
 {
     private readonly TcpListener _listener;
     private readonly Router _router;
-    private bool _isRunning;
+    private readonly HttpServerOptions _options;
+    private readonly SemaphoreSlim _connectionSemaphore;
+    private readonly CancellationTokenSource _serverCts = new();
+    private Task _serverTask = Task.CompletedTask;
 
-    public HttpServer(string ipAddress, int port)
+    public HttpServer(HttpServerOptions options)
     {
-        _listener = new TcpListener(IPAddress.Parse(ipAddress), port);
-        var projectState = new ProjectState();
-        _router = new Router(projectState);
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _listener = new TcpListener(IPAddress.Parse(options.IpAddress), options.Port);
+        _router = new Router(new ProjectState());
+        _connectionSemaphore = new SemaphoreSlim(options.MaxConcurrentConnections);
     }
 
     public void Start()
     {
-        _isRunning = true;
         _listener.Start();
         var endpoint = (IPEndPoint)_listener.LocalEndpoint;
-        Console.WriteLine($"Сервер запущен на http://{endpoint.Address}:{endpoint.Port}");
+        Console.WriteLine($"[INFO] Сервер запущен на http://{endpoint.Address}:{endpoint.Port}");
+        Console.WriteLine($"[INFO] Макс. параллельных подключений: {_options.MaxConcurrentConnections}");
 
-        while (_isRunning)
-        {
-            try
-            {
-                var client = _listener.AcceptTcpClient();
-                Task.Run(() => ProcessClient(client));
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Ошибка при принятии подключения: {ex.Message}");
-            }
-        }
+        _serverTask = Task.Run(RunAcceptLoopAsync);
     }
 
-    public void Stop()
+    public async Task StopAsync()
     {
-        _isRunning = false;
+        Console.WriteLine("[INFO] Остановка сервера...");
+        _serverCts.Cancel();
         _listener.Stop();
+        await _serverTask;
+        _connectionSemaphore.Dispose();
+        Console.WriteLine("[INFO] Сервер остановлен");
     }
 
-    private async Task ProcessClient(TcpClient client)
-    {
-        using (client)
-        using (var stream = client.GetStream())
-        using (var reader = new StreamReader(stream, Encoding.UTF8))
-        {
-            try
-            {
-                // Читаем HTTP-запрос
-                var request = await ReadHttpRequestAsync(reader);
-
-                if (request != null)
-                {
-                    // Выводим запрос в консоль для отладки
-                    Console.WriteLine($"{DateTime.Now:HH:mm:ss} - {request.Method} {request.Path}");
-
-                    // Обрабатываем запрос через маршрутизатор
-                    var response = _router.Route(request);
-
-                    // Отправляем ответ
-                    await SendResponseAsync(stream, response);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Ошибка обработки клиента: {ex.Message}");
-            }
-        }
-    }
-
-    private static async Task<HttpRequest?> ReadHttpRequestAsync(StreamReader reader)
+    private async Task RunAcceptLoopAsync()
     {
         try
         {
-            // Читаем первую строку запроса
-            var firstLine = await reader.ReadLineAsync();
-            if (string.IsNullOrEmpty(firstLine))
-                return null;
-
-            var parts = firstLine.Split(' ');
-            if (parts.Length < 3)
-                return null;
-
-            var method = parts[0];
-            var path = parts[1];
-
-            // Читаем заголовки
-            var headers = new Dictionary<string, string>();
-            string? line;
-            while (!string.IsNullOrEmpty(line = await reader.ReadLineAsync()))
+            while (!_serverCts.Token.IsCancellationRequested)
             {
-                var separatorIndex = line.IndexOf(':');
-                if (separatorIndex > 0)
+                try
                 {
-                    var key = line[..separatorIndex].Trim();
-                    var value = line[(separatorIndex + 1)..].Trim();
-                    headers[key] = value;
+                    var client = await _listener.AcceptTcpClientAsync(_serverCts.Token);
+                    
+                    client.Client.ReceiveTimeout = _options.ReceiveTimeoutMs;
+                    client.Client.SendTimeout = _options.SendTimeoutMs;
+
+                    await _connectionSemaphore.WaitAsync(_serverCts.Token);
+
+                    _ = Task.Run(() => ProcessClientAsync(client, _serverCts.Token))
+                            .ContinueWith(t =>
+                            {
+                                _connectionSemaphore.Release();
+                                if (t.IsFaulted && t.Exception != null)
+                                {
+                                    Console.Error.WriteLine($"[ERROR] Необработанное исключение: {t.Exception.InnerException?.Message}");
+                                }
+                            }, TaskContinuationOptions.ExecuteSynchronously);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (ObjectDisposedException) when (_serverCts.IsCancellationRequested)
+                {
+                    // Listener остановлен, выходим
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[ERROR] Ошибка принятия подключения: {ex.Message}");
                 }
             }
-
-            // Читаем тело запроса (если есть)
-            var body = "";
-            if (headers.TryGetValue("Content-Length", out var contentLengthStr))
-            {
-                var contentLength = int.Parse(contentLengthStr);
-                var buffer = new char[contentLength];
-                await reader.ReadAsync(buffer.AsMemory(0, contentLength));
-                body = new string(buffer);
-            }
-
-            return new HttpRequest
-            {
-                Method = method,
-                Path = path,
-                Headers = headers,
-                Body = body
-            };
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            Console.Error.WriteLine($"[FATAL] Ошибка в цикле приёма: {ex.Message}");
         }
     }
-    private static async Task SendResponseAsync(NetworkStream stream, HttpResponse response)
+
+    private async Task ProcessClientAsync(TcpClient client, CancellationToken cancellationToken)
     {
-        // Используем кодировку без BOM (Byte Order Mark)
-        var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
-    
-        // Формируем полный ответ как строку
-        var responseString = 
-            $"HTTP/1.1 {response.StatusCode} {response.StatusMessage}\r\n" +
-            $"Content-Type: {response.ContentType}\r\n" +
-            $"Content-Length: {encoding.GetByteCount(response.Content)}\r\n" +
-            "Connection: close\r\n" +
-            "\r\n" +
-            response.Content;
-    
-        // Преобразуем в байты и отправляем напрямую
-        var responseBytes = encoding.GetBytes(responseString);
-        await stream.WriteAsync(responseBytes.AsMemory(0, responseBytes.Length));
-        await stream.FlushAsync();
+        using (client)
+        {
+            var stream = client.GetStream();
+            try
+            {
+                // 1. Парсим запрос напрямую из NetworkStream
+                var request = await HttpParser.ReadHttpRequestAsync(stream, _options, cancellationToken);
+                if (request == null)
+                    return; // клиент закрыл соединение или сервер останавливается
+
+                Console.WriteLine($"{DateTime.Now:HH:mm:ss} - {request.Method} {request.Path}");
+
+                // 2. Маршрутизация (синхронная, но может быть заменена на асинхронную)
+                var response = _router.Route(request);
+
+                // 3. Отправка ответа
+                await HttpParser.SendResponseAsync(stream, response, cancellationToken);
+            }
+            catch (HttpRequestException ex) when (ex.IsTimeout)
+            {
+                await HttpParser.SendResponseAsync(stream, HttpResponse.Timeout(), cancellationToken);
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.Error.WriteLine($"[WARN] Некорректный запрос: {ex.Message}");
+                await HttpParser.SendResponseAsync(stream, HttpResponse.BadRequest(ex.Message), cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Сервер останавливается – просто выходим без ответа
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[ERROR] Внутренняя ошибка: {ex.Message}");
+                await HttpParser.SendResponseAsync(stream, HttpResponse.InternalServerError(), cancellationToken);
+            }
+        }
     }
-}
 
-public class HttpRequest
-{
-    public string Method { get; init; } = "";
-    public string Path { get; init; } = "";
-    public Dictionary<string, string> Headers { get; init; } = new();
-    public string Body { get; init; } = "";
-}
-
-public class HttpResponse
-{
-    public int StatusCode { get; init; } = 200;
-    public string StatusMessage { get; init; } = "OK";
-    public string ContentType => "text/html; charset=utf-8";
-    public string Content { get; init; } = "";
+    public void Dispose()
+    {
+        _serverCts?.Cancel();
+        _serverCts?.Dispose();
+        _connectionSemaphore?.Dispose();
+        _listener?.Stop();
+    }
 }
