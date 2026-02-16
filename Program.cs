@@ -7,7 +7,7 @@ namespace DocArhive;
 
 class Program
 {
-    static async Task Main(string[] args)
+    static async Task Main()
     {
         var options = new HttpServerOptions
         {
@@ -24,7 +24,7 @@ class Program
 
         var services = new ServiceCollection();
         services.AddLogging(builder => builder
-            .AddConsole()                
+            .AddConsole()
             .SetMinimumLevel(LogLevel.Information)
         );
         services.AddSingleton(options);
@@ -33,12 +33,21 @@ class Program
         var serviceProvider = services.BuildServiceProvider();
         var server = serviceProvider.GetRequiredService<HttpServer>();
 
+        var tcs = new TaskCompletionSource();
+
+        Console.CancelKeyPress += async (sender, e) =>
+        {
+            e.Cancel = true;
+            Console.WriteLine("Получен сигнал остановки. Завершаем работу...");
+            await server.StopAsync();
+            tcs.SetResult();
+        };
+
         try
         {
             server.Start();
-            Console.WriteLine("Нажмите Enter для остановки сервера...");
-            Console.ReadLine();
-            await server.StopAsync();
+            Console.WriteLine("Сервер запущен. Нажмите Ctrl+C для остановки...");
+            await tcs.Task;
         }
         catch (Exception ex)
         {

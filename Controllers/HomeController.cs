@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text;
 using DocArhive.Models;
 
@@ -73,54 +74,57 @@ public class HomeController
         return template.Replace("{{documentsCount}}", documentsHtml.ToString());
     }
 
-    public string Status()
+    // HomeController.cs — исправленный метод Status
+public string Status()
+{
+    var template = ReadViewFile("status.html");
+
+    var documentsHtml = new StringBuilder();
+
+    if (_state.Documents.Any())
     {
-        var template = ReadViewFile("status.html");
+        documentsHtml.AppendLine("<table>");
+        documentsHtml.AppendLine("<thead>");
+        documentsHtml.AppendLine("    <tr>");
+        documentsHtml.AppendLine("        <th>ID</th>");
+        documentsHtml.AppendLine("        <th>Название</th>");
+        documentsHtml.AppendLine("        <th>Категория</th>");
+        documentsHtml.AppendLine("        <th>Дата загрузки</th>");
+        documentsHtml.AppendLine("        <th>Имя файла</th>");
+        documentsHtml.AppendLine("    </tr>");
+        documentsHtml.AppendLine("</thead>");
+        documentsHtml.AppendLine("<tbody>");
 
-        var documentsHtml = new StringBuilder();
-
-        if (_state.Documents.Any())
+        foreach (var doc in _state.Documents)
         {
-            documentsHtml.AppendLine("<table>");
-            documentsHtml.AppendLine("<thead>");
             documentsHtml.AppendLine("    <tr>");
-            documentsHtml.AppendLine("        <th>ID</th>");
-            documentsHtml.AppendLine("        <th>Название</th>");
-            documentsHtml.AppendLine("        <th>Категория</th>");
-            documentsHtml.AppendLine("        <th>Дата загрузки</th>");
-            documentsHtml.AppendLine("        <th>Имя файла</th>");
+            documentsHtml.AppendLine($"        <td>{doc.Id}</td>");
+            documentsHtml.AppendLine($"        <td>{WebUtility.HtmlEncode(doc.Title)}</td>");
+            documentsHtml.AppendLine($"        <td>{WebUtility.HtmlEncode(doc.Category)}</td>");
+            documentsHtml.AppendLine($"        <td>{doc.UploadDate:yyyy-MM-dd HH:mm}</td>");
+            documentsHtml.AppendLine($"        <td>{WebUtility.HtmlEncode(doc.FileName)}</td>");
             documentsHtml.AppendLine("    </tr>");
-            documentsHtml.AppendLine("</thead>");
-            documentsHtml.AppendLine("<tbody>");
-
-            foreach (var doc in _state.Documents)
-            {
-                documentsHtml.AppendLine("    <tr>");
-                documentsHtml.AppendLine($"        <td>{doc.Id}</td>");
-                documentsHtml.AppendLine($"        <td>{doc.Title}</td>");
-                documentsHtml.AppendLine($"        <td>{doc.Category}</td>");
-                documentsHtml.AppendLine($"        <td>{doc.UploadDate:yyyy-MM-dd HH:mm}</td>");
-                documentsHtml.AppendLine($"        <td>{doc.FileName}</td>");
-                documentsHtml.AppendLine("    </tr>");
-            }
-
-            documentsHtml.AppendLine("</tbody>");
-            documentsHtml.AppendLine("</table>");
-            documentsHtml.AppendLine("<div>");
-            documentsHtml.AppendLine($"<p> Всего документов в архиве: {_state.Documents.Count}</p>");
-            documentsHtml.AppendLine("</div>");
-        }
-        else
-        {
-            documentsHtml.AppendLine("<div style='padding: 20px; background: #f8f9fa; text-align: center;'>");
-            documentsHtml.AppendLine("    <p>Не загружено ни одного документа</p>");
-            documentsHtml.AppendLine("    <p><a href='/'>Добавить документ</a></p>");
-            documentsHtml.AppendLine("</div>");
         }
 
-        var html = template
-            .Replace("{{documents_list}}", documentsHtml.ToString());
-
-        return html;
+        documentsHtml.AppendLine("</tbody>");
+        documentsHtml.AppendLine("</table>");
+        documentsHtml.AppendLine("<div>");
+        documentsHtml.AppendLine($"<p> Всего документов в архиве: {_state.Documents.Count}</p>");
+        documentsHtml.AppendLine("</div>");
     }
+    else
+    {
+        documentsHtml.AppendLine("<div style='padding: 20px; background: #f8f9fa; text-align: center;'>");
+        documentsHtml.AppendLine("    <p>Не загружено ни одного документа</p>");
+        documentsHtml.AppendLine("    <p><a href='/'>Добавить документ</a></p>");
+        documentsHtml.AppendLine("</div>");
+    }
+
+    var html = template
+        .Replace("{{total_documents}}", _state.TotalDocuments.ToString())
+        .Replace("{{last_update}}", _state.LastUpdate.ToString("yyyy-MM-dd HH:mm:ss"))
+        .Replace("{{documents_list}}", documentsHtml.ToString());
+
+    return html;
+}
 }

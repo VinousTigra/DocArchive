@@ -149,8 +149,7 @@ public class HttpServer : IDisposable
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Внутренняя ошибка");
-                    await HttpParser.SendResponseAsync(stream, HttpResponse.InternalServerError(), cancellationToken,
-                        false);
+                    await HttpParser.SendResponseAsync(stream, HttpResponse.InternalServerError(), cancellationToken);
                     break;
                 }
             }
