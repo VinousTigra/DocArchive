@@ -10,7 +10,7 @@ namespace DocArhive;
 
 class Program
 {
-    static async Task Main(string[] args)
+    static async Task Main()
     {
         var options = new HttpServerOptions
         {
@@ -38,7 +38,7 @@ class Program
         services.AddSingleton<HttpServer>();
 
         var serviceProvider = services.BuildServiceProvider();
-        var server = serviceProvider.GetRequiredService<HttpServer>();
+        HttpServer server = serviceProvider.GetRequiredService<HttpServer>();
 
         var cts = new CancellationTokenSource();
 

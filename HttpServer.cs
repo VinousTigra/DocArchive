@@ -5,7 +5,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using DocArhive.Models;
 using Microsoft.Extensions.Logging;
 
 namespace DocArhive;
@@ -58,21 +57,21 @@ public class HttpServer : IDisposable
                 try
                 {
                     var client = await _listener.AcceptTcpClientAsync(_serverCts.Token);
-                    
+
                     client.Client.ReceiveTimeout = _options.ReceiveTimeoutMs;
                     client.Client.SendTimeout = _options.SendTimeoutMs;
 
                     await _connectionSemaphore.WaitAsync(_serverCts.Token);
 
                     _ = Task.Run(() => ProcessClientAsync(client, _serverCts.Token))
-                            .ContinueWith(t =>
+                        .ContinueWith(t =>
+                        {
+                            _connectionSemaphore.Release();
+                            if (t.IsFaulted && t.Exception != null)
                             {
-                                _connectionSemaphore.Release();
-                                if (t.IsFaulted && t.Exception != null)
-                                {
-                                    _logger.LogError(t.Exception, "Необработанное исключение при обработке клиента");
-                                }
-                            }, TaskContinuationOptions.ExecuteSynchronously);
+                                _logger.LogError(t.Exception, "Необработанное исключение при обработке клиента");
+                            }
+                        }, TaskContinuationOptions.ExecuteSynchronously);
                 }
                 catch (OperationCanceledException)
                 {
@@ -106,7 +105,8 @@ public class HttpServer : IDisposable
                 try
                 {
                     using var timeoutCts = new CancellationTokenSource(_options.KeepAliveTimeoutMs);
-                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+                    using var linkedCts =
+                        CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
                     var token = linkedCts.Token;
 
                     var request = await HttpParser.ReadHttpRequestAsync(stream, _options, token);
@@ -116,7 +116,8 @@ public class HttpServer : IDisposable
                         break;
                     }
 
-                    _logger.LogInformation("{Time:HH:mm:ss} - {Method} {Path}", DateTime.Now, request.Method, request.Path);
+                    _logger.LogInformation("{Time:HH:mm:ss} - {Method} {Path}", DateTime.Now, request.Method,
+                        request.Path);
                     var response = await _router.RouteAsync(request);
 
                     bool keepAliveRequested = true;
@@ -127,6 +128,7 @@ public class HttpServer : IDisposable
                         else if (reqConn.Equals("keep-alive", StringComparison.OrdinalIgnoreCase))
                             keepAliveRequested = true;
                     }
+
                     keepAlive = response.KeepAlive ?? keepAliveRequested;
 
                     await HttpParser.SendResponseAsync(stream, response, token, keepAlive);
@@ -144,8 +146,10 @@ public class HttpServer : IDisposable
                         _logger.LogDebug("Клиент закрыл соединение во время передачи");
                         break;
                     }
+
                     _logger.LogWarning(ex, "Некорректный запрос");
-                    await HttpParser.SendResponseAsync(stream, HttpResponse.BadRequest(ex.Message), cancellationToken, false);
+                    await HttpParser.SendResponseAsync(stream, HttpResponse.BadRequest(ex.Message), cancellationToken,
+                        false);
                     break;
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -155,7 +159,7 @@ public class HttpServer : IDisposable
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Внутренняя ошибка");
-                    await HttpParser.SendResponseAsync(stream, HttpResponse.InternalServerError(), cancellationToken, false);
+                    await HttpParser.SendResponseAsync(stream, HttpResponse.InternalServerError(), cancellationToken);
                     break;
                 }
             }
@@ -164,9 +168,9 @@ public class HttpServer : IDisposable
 
     public void Dispose()
     {
-        _serverCts?.Cancel();
-        _serverCts?.Dispose();
-        _connectionSemaphore?.Dispose();
-        _listener?.Stop();
+        _serverCts.Cancel();
+        _serverCts.Dispose();
+        _connectionSemaphore.Dispose();
+        _listener.Stop();
     }
 }
