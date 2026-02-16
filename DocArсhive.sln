@@ -1,7 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 #
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DocArhive", "DocArhive.csproj", "{C3F5432C-468C-45ED-982D-AD0DCEEBE4A9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DocArchive", "DocArchive.csproj", "{C3F5432C-468C-45ED-982D-AD0DCEEBE4A9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DocArhive.Tests", "..\DocArhive.Tests\DocArhive.Tests.csproj", "{9A90A91F-9074-4B0A-B493-1CE5310C8FEF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,5 +15,9 @@ Global
 		{C3F5432C-468C-45ED-982D-AD0DCEEBE4A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C3F5432C-468C-45ED-982D-AD0DCEEBE4A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C3F5432C-468C-45ED-982D-AD0DCEEBE4A9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9A90A91F-9074-4B0A-B493-1CE5310C8FEF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A90A91F-9074-4B0A-B493-1CE5310C8FEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A90A91F-9074-4B0A-B493-1CE5310C8FEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A90A91F-9074-4B0A-B493-1CE5310C8FEF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

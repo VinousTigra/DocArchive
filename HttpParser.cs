@@ -34,7 +34,7 @@ public static class HttpParser
     /// Читает HTTP-запрос из потока с использованием конечного автомата и буферизованного чтения.
     /// </summary>
     public static async Task<HttpRequest?> ReadHttpRequestAsync(
-        NetworkStream stream,
+        Stream stream,
         HttpServerOptions options,
         CancellationToken cancellationToken)
     {
@@ -311,7 +311,7 @@ public static class HttpParser
     /// Отправляет HTTP-ответ в поток.
     /// </summary>
     public static async Task SendResponseAsync(
-        NetworkStream stream,
+        Stream stream,
         HttpResponse response,
         CancellationToken cancellationToken,
         bool keepAlive = false)
