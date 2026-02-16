@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Net;
 using DocArhive.Models;
 
 namespace DocArhive.Controllers;
@@ -43,7 +44,7 @@ public class ArchiveController
     <title>Ошибка</title>
     <script>
         // Показываем alert с ошибкой
-        alert('Ошибка: {message}');
+        alert('Ошибка: {WebUtility.HtmlEncode(message)}');
         // Возвращаем на главную страницу
         window.location.href = '/';
     </script>
@@ -72,7 +73,7 @@ public class ArchiveController
     <title>Успешно</title>
     <script>
         // Показываем alert с подтверждением
-        //alert('Документ ""{EscapeForJavaScript(document.Title)}"" успешно добавлен!');
+        //alert('Документ ""{EscapeForJavaScript(WebUtility.HtmlEncode(document.Title))}"" успешно добавлен!');
      
         // Перенаправляем на главную страницу
          setTimeout(function() {{
