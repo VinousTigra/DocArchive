@@ -36,6 +36,7 @@ public class HomeController
                 if (parent == null) break;
                 projectRoot = parent.FullName;
             }
+
             return projectRoot ?? currentDir;
         }
 
@@ -73,9 +74,11 @@ public class HomeController
 
         if (_state.Documents.Any())
         {
-            documentsHtml.AppendLine("<table border='1' cellpadding='8' style='border-collapse: collapse; width:100%;'>");
+            documentsHtml.AppendLine(
+                "<table border='1' cellpadding='8' style='border-collapse: collapse; width:100%;'>");
             documentsHtml.AppendLine("<thead><tr style='background:#3498db; color:white;'>");
-            documentsHtml.AppendLine("<th>ID</th><th>Название</th><th>Категория</th><th>Дата загрузки</th><th>Имя файла</th>");
+            documentsHtml.AppendLine(
+                "<th>ID</th><th>Название</th><th>Категория</th><th>Дата загрузки</th><th>Имя файла</th>");
             documentsHtml.AppendLine("</tr></thead><tbody>");
 
             foreach (var doc in _state.Documents)
@@ -128,18 +131,18 @@ public class HomeController
 </head>
 <body>
     <div class='container'>
-        <h1>📁 Электронный архив документов</h1>
+        <h1> Электронный архив документов</h1>
         <div class='nav'>
-            <a href='/'>🏠 Главная</a>
-            <a href='/status'>📊 Статус архива</a>
+            <a href='/'> Главная</a>
+            <a href='/status'> Статус архива</a>
         </div>
-        <h2>➕ Добавить новый документ</h2>
+        <h2>Добавить новый документ</h2>
         <form method='post' action='/action'>
             <input type='text' name='title' placeholder='Название' required>
             <textarea name='description' placeholder='Описание' rows='3'></textarea>
             <input type='text' name='filename' placeholder='Имя файла' required>
             <input type='text' name='category' placeholder='Категория'>
-            <button type='submit'>📤 Добавить документ в архив</button>
+            <button type='submit'> Добавить документ в архив</button>
         </form>
     </div>
 </body>
@@ -168,17 +171,17 @@ public class HomeController
 </head>
 <body>
     <div class='container'>
-        <h1>📊 Состояние электронного архива</h1>
+        <h1>Состояние электронного архива</h1>
         <div class='nav'>
             <a href='/'>🏠 Главная</a>
-            <a href='/status'>🔄 Обновить</a>
+            <a href='/status'> Обновить</a>
         </div>
         <div class='stats'>
             <h2>Общая статистика</h2>
             <p><strong>Всего документов:</strong> {{total_documents}}</p>
             <p><strong>Последнее обновление:</strong> {{last_update}}</p>
         </div>
-        <h2>📁 Список документов</h2>
+        <h2>Список документов</h2>
         {{documents_list}}
     </div>
 </body>

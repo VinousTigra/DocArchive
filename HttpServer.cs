@@ -98,7 +98,7 @@ public class HttpServer : IDisposable
         using (client)
         {
             var stream = client.GetStream();
-            bool keepAlive = true;
+            bool keepAlive = true; 
 
             while (keepAlive && !cancellationToken.IsCancellationRequested)
             {
@@ -136,7 +136,9 @@ public class HttpServer : IDisposable
                 catch (HttpParser.HttpRequestException ex) when (ex.IsTimeout)
                 {
                     _logger.LogWarning("Таймаут ожидания следующего запроса");
-                    await HttpParser.SendResponseAsync(stream, HttpResponse.Timeout(), cancellationToken, false);
+                    var timeoutResponse = HttpResponse.Timeout();
+                    await HttpParser.SendResponseAsync(stream, timeoutResponse, cancellationToken, false);
+                    await stream.FlushAsync(); // принудительно отправляем
                     break;
                 }
                 catch (HttpParser.HttpRequestException ex)

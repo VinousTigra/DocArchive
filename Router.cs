@@ -26,16 +26,20 @@ public class Router
     {
         try
         {
-            return request.Method.ToUpperInvariant() switch
+            var response = request.Method.ToUpperInvariant() switch
             {
                 "GET" => RouteGetAsync(request),
                 "POST" => RoutePostAsync(request),
                 _ => Task.FromResult(HttpResponse.MethodNotAllowed())
             };
+            // Логируем результат
+            Console.WriteLine(
+                $"[Router] {request.Method} {request.Path} -> {response.Result.StatusCode} {response.Result.StatusMessage}");
+            return response;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка маршрутизации");
+            Console.WriteLine($"[Router] Исключение: {ex.Message}");
             return Task.FromResult(HttpResponse.InternalServerError("Внутренняя ошибка сервера"));
         }
     }
@@ -47,7 +51,7 @@ public class Router
             "/" => Task.FromResult(HttpResponse.Ok(_homeController.Index())),
             "/status" => Task.FromResult(HttpResponse.Ok(_homeController.Status())),
             "/health" => Task.FromResult(HttpResponse.Ok("Healthy", "text/plain")),
-            "/favicon.ico" => Task.FromResult(HttpResponse.Empty(204)), // No Content
+            "/favicon.ico" => Task.FromResult(HttpResponse.Empty()), // No Content
             _ => Task.FromResult(HttpResponse.NotFound("Страница не найдена"))
         };
     }
@@ -74,6 +78,7 @@ public class Router
                 return Task.FromResult(HttpResponse.InternalServerError("Внутренняя ошибка сервера"));
             }
         }
+
         return Task.FromResult(HttpResponse.NotFound());
     }
 
@@ -100,6 +105,7 @@ public class Router
 
             result[key].Add(value);
         }
+
         return result;
     }
 }
