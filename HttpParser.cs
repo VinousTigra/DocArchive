@@ -30,31 +30,34 @@ public static class HttpParser
         Done
     }
 
+    private const int MaxTokenLength = 1024;
+    private const int MaxUriLength = 2048;
+
     /// <summary>
-    /// Читает HTTP-запрос из потока с использованием конечного автомата и буферизованного чтения.
+    /// Читает HTTP-запрос из потока, используя конечный автомат и буферизованное чтение.
     /// </summary>
     public static async Task<HttpRequest?> ReadHttpRequestAsync(
         NetworkStream stream,
         HttpServerOptions options,
         CancellationToken cancellationToken)
     {
-        // Таймаут на чтение всего запроса
-        using var timeoutCts = new CancellationTokenSource();
-        timeoutCts.CancelAfter(options.ReceiveTimeoutMs);
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-        var combinedToken = linkedCts.Token;
-
-        var buffer = new byte[8192]; // 8 КБ буфер
+        var buffer = new byte[8192];
         var request = new HttpRequest();
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var state = ParseState.Method;
         var currentToken = new StringBuilder(128);
         string? headerKey = null;
         int contentLength = -1;
-        int chunkSize = 0;
-        int bodyRead = 0;
+        int totalHeaderSize = 0;
+        int totalBodySize = 0;
         var bodyBuffer = new MemoryStream();
-        
+
+        int chunkSize = 0;
+        int chunkBytesRead = 0;
+
+        using var timeoutCts = new CancellationTokenSource(options.ReceiveTimeoutMs);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+        var combinedToken = linkedCts.Token;
 
         int offset = 0, count = 0;
 
@@ -67,10 +70,14 @@ public static class HttpParser
                     count = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), combinedToken);
                     if (count == 0)
                     {
-                        if (state != ParseState.Done && state != ParseState.Body)
-                            throw new HttpRequestException("Неожиданный конец потока");
-                        break;
+                        // Если мы ещё не прочитали ни одного байта для этого запроса – клиент закрыл соединение
+                        if (offset == 0 && state == ParseState.Method && currentToken.Length == 0)
+                            return null; // нормальное завершение keep-alive
+
+                        // Иначе – обрыв во время передачи данных
+                        throw new HttpRequestException("Неожиданный конец потока");
                     }
+
                     offset = 0;
                 }
 
@@ -78,6 +85,9 @@ public static class HttpParser
                 {
                     byte b = buffer[offset++];
                     char ch = (char)b;
+
+                    if (currentToken.Length > MaxTokenLength)
+                        throw new HttpRequestException($"Слишком длинный токен (> {MaxTokenLength})");
 
                     switch (state)
                     {
@@ -96,11 +106,14 @@ public static class HttpParser
                             {
                                 throw new HttpRequestException("Некорректный символ в методе");
                             }
+
                             break;
 
                         case ParseState.Path:
                             if (ch == ' ')
                             {
+                                if (currentToken.Length > MaxUriLength)
+                                    throw new HttpRequestException("414 URI Too Long");
                                 request.Path = currentToken.ToString();
                                 currentToken.Clear();
                                 state = ParseState.Version;
@@ -109,6 +122,7 @@ public static class HttpParser
                             {
                                 currentToken.Append(ch);
                             }
+
                             break;
 
                         case ParseState.Version:
@@ -125,6 +139,7 @@ public static class HttpParser
                             {
                                 currentToken.Append(ch);
                             }
+
                             break;
 
                         case ParseState.HeaderKey:
@@ -136,18 +151,18 @@ public static class HttpParser
                             }
                             else if (ch == '\r')
                             {
-                                // пустая строка – конец заголовков
                                 currentToken.Clear();
                                 state = ParseState.Body;
                             }
                             else if (ch == '\n')
                             {
-                                // игнорируем возможный лишний \n
+                                // игнорируем
                             }
                             else
                             {
                                 currentToken.Append(ch);
                             }
+
                             break;
 
                         case ParseState.HeaderValue:
@@ -155,6 +170,14 @@ public static class HttpParser
                             {
                                 var value = currentToken.ToString().Trim();
                                 currentToken.Clear();
+
+                                if (headers.Count >= options.MaxHeaderCount)
+                                    throw new HttpRequestException("431 Request Header Fields Too Large");
+
+                                totalHeaderSize += headerKey!.Length + value.Length + 2;
+                                if (totalHeaderSize > options.MaxHeaderSize)
+                                    throw new HttpRequestException("431 Request Header Fields Too Large");
+
                                 headers[headerKey!] = value;
                                 headerKey = null;
                                 state = ParseState.HeaderLf;
@@ -163,6 +186,7 @@ public static class HttpParser
                             {
                                 currentToken.Append(ch);
                             }
+
                             break;
 
                         case ParseState.HeaderLf:
@@ -174,6 +198,7 @@ public static class HttpParser
                             {
                                 throw new HttpRequestException("Ожидался LF после CR");
                             }
+
                             break;
 
                         case ParseState.Body:
@@ -185,15 +210,16 @@ public static class HttpParser
                                 if (contentLength > options.MaxRequestSize)
                                     throw new HttpRequestException("413 Payload Too Large");
 
-                                int remaining = contentLength - bodyRead;
+                                int remaining = contentLength - totalBodySize;
                                 int toRead = Math.Min(remaining, count - offset);
                                 if (toRead > 0)
                                 {
                                     await bodyBuffer.WriteAsync(buffer, offset, toRead);
                                     offset += toRead;
-                                    bodyRead += toRead;
+                                    totalBodySize += toRead;
                                 }
-                                if (bodyRead >= contentLength)
+
+                                if (totalBodySize >= contentLength)
                                     state = ParseState.Done;
                             }
                             else if (headers.TryGetValue("Transfer-Encoding", out var te) &&
@@ -205,6 +231,7 @@ public static class HttpParser
                             {
                                 state = ParseState.Done;
                             }
+
                             break;
 
                         case ParseState.ChunkSize:
@@ -214,7 +241,8 @@ public static class HttpParser
                             }
                             else if (ch == '\n')
                             {
-                                if (!int.TryParse(currentToken.ToString(), System.Globalization.NumberStyles.HexNumber, null, out chunkSize))
+                                if (!int.TryParse(currentToken.ToString(), System.Globalization.NumberStyles.HexNumber,
+                                        null, out chunkSize))
                                     throw new HttpRequestException("Некорректный размер чанка");
 
                                 if (chunkSize == 0)
@@ -223,31 +251,37 @@ public static class HttpParser
                                 }
                                 else
                                 {
-                                    if (bodyBuffer.Length + chunkSize > options.MaxRequestSize)
+                                    if (totalBodySize + chunkSize > options.MaxRequestSize)
                                         throw new HttpRequestException("413 Payload Too Large");
+                                    chunkBytesRead = 0;
                                     state = ParseState.ChunkData;
                                 }
+
                                 currentToken.Clear();
                             }
                             else
                             {
                                 currentToken.Append(ch);
                             }
+
                             break;
 
                         case ParseState.ChunkData:
-                            int remainingChunk = chunkSize - (int)(bodyBuffer.Length - bodyRead);
+                            int remainingChunk = chunkSize - chunkBytesRead;
                             int toReadChunk = Math.Min(remainingChunk, count - offset);
                             if (toReadChunk > 0)
                             {
                                 await bodyBuffer.WriteAsync(buffer, offset, toReadChunk);
                                 offset += toReadChunk;
-                                bodyRead += toReadChunk;
+                                chunkBytesRead += toReadChunk;
+                                totalBodySize += toReadChunk;
                             }
-                            if (bodyRead - (int)bodyBuffer.Length == 0) // все данные чанка записаны?
+
+                            if (chunkBytesRead >= chunkSize)
                             {
                                 state = ParseState.ChunkCr;
                             }
+
                             break;
 
                         case ParseState.ChunkCr:
@@ -263,6 +297,7 @@ public static class HttpParser
                             {
                                 throw new HttpRequestException("Ожидался CRLF после данных чанка");
                             }
+
                             break;
 
                         case ParseState.Trailer:
@@ -281,79 +316,97 @@ public static class HttpParser
                             {
                                 currentToken.Append(ch);
                             }
+
                             break;
                     }
                 }
             }
 
-            request.Headers = headers;
-            request.Body = bodyBuffer.Length > 0 ? Encoding.UTF8.GetString(bodyBuffer.ToArray()) : "";
+            // Декодируем тело, если оно есть
+            if (bodyBuffer.Length > 0)
+            {
+                try
+                {
+                    request.Body = Encoding.UTF8.GetString(bodyBuffer.ToArray());
+                }
+                catch (DecoderFallbackException ex)
+                {
+                    throw new HttpRequestException("Некорректная UTF-8 последовательность в теле запроса", ex);
+                }
+            }
+            else
+            {
+                request.Body = "";
+            }
 
+            request.Headers = headers;
             return request;
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
         {
-            // Таймаут чтения запроса
+            // Таймаут ожидания данных
             throw new HttpRequestException("408 Request Timeout", true);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // Сервер останавливается – просто выходим
+            // Сервер останавливается
             return null;
-        }
-        catch (TimeoutException)
-        {
-            throw new HttpRequestException("408 Request Timeout", true);
         }
     }
 
-    /// <summary>
-    /// Отправляет HTTP-ответ в поток.
-    /// </summary>
     public static async Task SendResponseAsync(
         NetworkStream stream,
         HttpResponse response,
         CancellationToken cancellationToken,
         bool keepAlive = false)
     {
-        var header = $"HTTP/1.1 {response.StatusCode} {response.StatusMessage}\r\n" +
-                     $"Content-Type: {response.ContentType}\r\n" +
-                     $"Content-Length: {Encoding.UTF8.GetByteCount(response.Content)}\r\n" +
-                     $"Connection: {(keepAlive ? "keep-alive" : "close")}\r\n" +
-                     "\r\n";
+        var sb = new StringBuilder();
+        sb.Append($"HTTP/1.1 {response.StatusCode} {response.StatusMessage}\r\n");
 
-        var headerBytes = Encoding.UTF8.GetBytes(header);
-        await stream.WriteAsync(headerBytes.AsMemory(0, headerBytes.Length), cancellationToken);
+        // Пользовательские заголовки
+        foreach (var header in response.Headers)
+        {
+            sb.Append($"{header.Key}: {header.Value}\r\n");
+        }
+
+        // Стандартные заголовки, если не заданы
+        if (!response.Headers.ContainsKey("Content-Type"))
+            sb.Append($"Content-Type: {response.ContentType}\r\n");
+
+        if (!response.Headers.ContainsKey("Content-Length"))
+        {
+            long contentLength = response.BodyStream?.Length ?? Encoding.UTF8.GetByteCount(response.Content);
+            sb.Append($"Content-Length: {contentLength}\r\n");
+        }
+
+        sb.Append($"Connection: {(keepAlive ? "keep-alive" : "close")}\r\n");
+        sb.Append("\r\n");
+
+        await stream.WriteAsync(Encoding.UTF8.GetBytes(sb.ToString()).AsMemory(0, sb.Length), cancellationToken);
 
         if (response.BodyStream != null)
-        {   
+        {
             await response.BodyStream.CopyToAsync(stream, 81920, cancellationToken);
         }
         else if (!string.IsNullOrEmpty(response.Content))
         {
-            var bodyBytes = Encoding.UTF8.GetBytes(response.Content);
-            await stream.WriteAsync(bodyBytes.AsMemory(0, bodyBytes.Length), cancellationToken);
+            await stream.WriteAsync(Encoding.UTF8.GetBytes(response.Content).AsMemory(0, response.Content.Length),
+                cancellationToken);
+        }
+    }
+
+    public class HttpRequestException : Exception
+    {
+        public bool IsTimeout { get; }
+
+        public HttpRequestException(string message, bool isTimeout = false) : base(message)
+        {
+            IsTimeout = isTimeout;
         }
 
-        // Принудительно отправляем данные (на всякий случай)
-        await stream.FlushAsync(cancellationToken);
-    }
-}
-
-/// <summary>
-/// Исключение, возникающее при ошибках парсинга HTTP.
-/// </summary>
-public class HttpRequestException : Exception
-{
-    public bool IsTimeout { get; }
-
-    public HttpRequestException(string message, bool isTimeout = false) : base(message)
-    {
-        IsTimeout = isTimeout;
-    }
-
-    public HttpRequestException(string message, Exception inner, bool isTimeout = false) : base(message, inner)
-    {
-        IsTimeout = isTimeout;
+        public HttpRequestException(string message, Exception inner, bool isTimeout = false) : base(message, inner)
+        {
+            IsTimeout = isTimeout;
+        }
     }
 }

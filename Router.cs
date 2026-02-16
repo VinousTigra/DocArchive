@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 using DocArhive.Controllers;
-using DocArhive.Models;
+using Microsoft.Extensions.Logging;
 
 namespace DocArhive;
 
@@ -13,11 +13,13 @@ public class Router
 {
     private readonly HomeController _homeController;
     private readonly ArchiveController _archiveController;
+    private readonly ILogger<Router> _logger;
 
-    public Router(ProjectState projectState)
+    public Router(HomeController homeController, ArchiveController archiveController, ILogger<Router> logger)
     {
-        _homeController = new HomeController(projectState);
-        _archiveController = new ArchiveController(projectState);
+        _homeController = homeController;
+        _archiveController = archiveController;
+        _logger = logger;
     }
 
     public Task<HttpResponse> RouteAsync(HttpRequest request)
@@ -33,7 +35,7 @@ public class Router
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Ошибка маршрутизации: {ex.Message}");
+            _logger.LogError(ex, "Ошибка маршрутизации");
             return Task.FromResult(HttpResponse.InternalServerError("Внутренняя ошибка сервера"));
         }
     }
@@ -45,6 +47,7 @@ public class Router
             "/" => Task.FromResult(HttpResponse.Ok(_homeController.Index())),
             "/status" => Task.FromResult(HttpResponse.Ok(_homeController.Status())),
             "/health" => Task.FromResult(HttpResponse.Ok("Healthy", "text/plain")),
+            "/favicon.ico" => Task.FromResult(HttpResponse.Empty(204)), // No Content
             _ => Task.FromResult(HttpResponse.NotFound("Страница не найдена"))
         };
     }
@@ -53,30 +56,50 @@ public class Router
     {
         if (request.Path == "/action")
         {
-            var formData = ParseFormData(request.Body);
-            var result = _archiveController.AddDocument(formData);
-            return Task.FromResult(HttpResponse.Ok(result));
+            try
+            {
+                var formData = ParseFormData(request.Body);
+                _logger.LogInformation("Получены поля формы: {Fields}", string.Join(", ", formData.Keys));
+                _archiveController.AddDocument(formData);
+                return Task.FromResult(HttpResponse.Redirect("/status"));
+            }
+            catch (ArgumentException ex) // ошибка валидации
+            {
+                _logger.LogWarning("Ошибка валидации: {Message}", ex.Message);
+                return Task.FromResult(HttpResponse.BadRequest(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка обработки POST /action");
+                return Task.FromResult(HttpResponse.InternalServerError("Внутренняя ошибка сервера"));
+            }
         }
         return Task.FromResult(HttpResponse.NotFound());
     }
 
-    private static Dictionary<string, string> ParseFormData(string body)
+    private static Dictionary<string, List<string>> ParseFormData(string body)
     {
-        var formData = new Dictionary<string, string>();
-        if (!string.IsNullOrEmpty(body))
+        var result = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrEmpty(body))
+            return result;
+
+        var pairs = body.Split('&', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var pair in pairs)
         {
-            var pairs = body.Split('&');
-            foreach (var pair in pairs)
-            {
-                var keyValue = pair.Split('=');
-                if (keyValue.Length == 2)
-                {
-                    var key = WebUtility.UrlDecode(keyValue[0]);
-                    var value = WebUtility.UrlDecode(keyValue[1]);
-                    formData[key] = value;
-                }
-            }
+            var keyValue = pair.Split('=');
+            if (keyValue.Length != 2) continue;
+
+            var key = WebUtility.UrlDecode(keyValue[0]);
+            var value = WebUtility.UrlDecode(keyValue[1]);
+
+            if (key.EndsWith("[]", StringComparison.Ordinal))
+                key = key[..^2];
+
+            if (!result.ContainsKey(key))
+                result[key] = new List<string>();
+
+            result[key].Add(value);
         }
-        return formData;
+        return result;
     }
 }

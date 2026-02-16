@@ -1,4 +1,6 @@
-﻿using System;
+﻿#nullable enable
+
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -18,12 +20,12 @@ public class HttpServer : IDisposable
     private readonly ILogger<HttpServer> _logger;
     private Task _serverTask = Task.CompletedTask;
 
-    public HttpServer(HttpServerOptions options, ILogger<HttpServer> logger)
+    public HttpServer(HttpServerOptions options, ILogger<HttpServer> logger, Router router)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _router = router ?? throw new ArgumentNullException(nameof(router));
         _listener = new TcpListener(IPAddress.Parse(options.IpAddress), options.Port);
-        _router = new Router(new ProjectState());
         _connectionSemaphore = new SemaphoreSlim(options.MaxConcurrentConnections);
     }
 
@@ -56,21 +58,21 @@ public class HttpServer : IDisposable
                 try
                 {
                     var client = await _listener.AcceptTcpClientAsync(_serverCts.Token);
-
+                    
                     client.Client.ReceiveTimeout = _options.ReceiveTimeoutMs;
                     client.Client.SendTimeout = _options.SendTimeoutMs;
 
                     await _connectionSemaphore.WaitAsync(_serverCts.Token);
 
                     _ = Task.Run(() => ProcessClientAsync(client, _serverCts.Token))
-                        .ContinueWith(t =>
-                        {
-                            _connectionSemaphore.Release();
-                            if (t.IsFaulted && t.Exception != null)
+                            .ContinueWith(t =>
                             {
-                                _logger.LogError(t.Exception, "Необработанное исключение при обработке клиента");
-                            }
-                        }, TaskContinuationOptions.ExecuteSynchronously);
+                                _connectionSemaphore.Release();
+                                if (t.IsFaulted && t.Exception != null)
+                                {
+                                    _logger.LogError(t.Exception, "Необработанное исключение при обработке клиента");
+                                }
+                            }, TaskContinuationOptions.ExecuteSynchronously);
                 }
                 catch (OperationCanceledException)
                 {
@@ -103,54 +105,57 @@ public class HttpServer : IDisposable
             {
                 try
                 {
-                    // Таймаут ожидания следующего запроса на этом соединении
                     using var timeoutCts = new CancellationTokenSource(_options.KeepAliveTimeoutMs);
-                    using var linkedCts =
-                        CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
                     var token = linkedCts.Token;
 
                     var request = await HttpParser.ReadHttpRequestAsync(stream, _options, token);
                     if (request == null)
-                        break; // клиент закрыл соединение
-
-                    _logger.LogInformation("{Time:HH:mm:ss} - {Method} {Path}", DateTime.Now, request.Method,
-                        request.Path);
-                    var response = await _router.RouteAsync(request);
-
-                    // Определяем, нужно ли закрыть соединение
-                    if (request.Headers.TryGetValue("Connection", out var reqConn) &&
-                        reqConn.Equals("close", StringComparison.OrdinalIgnoreCase))
                     {
-                        keepAlive = false;
+                        _logger.LogDebug("Клиент закрыл соединение");
+                        break;
                     }
 
-                    if (!response.KeepAlive) keepAlive = false;
+                    _logger.LogInformation("{Time:HH:mm:ss} - {Method} {Path}", DateTime.Now, request.Method, request.Path);
+                    var response = await _router.RouteAsync(request);
+
+                    bool keepAliveRequested = true;
+                    if (request.Headers.TryGetValue("Connection", out var reqConn))
+                    {
+                        if (reqConn.Equals("close", StringComparison.OrdinalIgnoreCase))
+                            keepAliveRequested = false;
+                        else if (reqConn.Equals("keep-alive", StringComparison.OrdinalIgnoreCase))
+                            keepAliveRequested = true;
+                    }
+                    keepAlive = response.KeepAlive ?? keepAliveRequested;
 
                     await HttpParser.SendResponseAsync(stream, response, token, keepAlive);
                 }
-                catch (HttpRequestException ex) when (ex.IsTimeout)
+                catch (HttpParser.HttpRequestException ex) when (ex.IsTimeout)
                 {
                     _logger.LogWarning("Таймаут ожидания следующего запроса");
                     await HttpParser.SendResponseAsync(stream, HttpResponse.Timeout(), cancellationToken, false);
                     break;
                 }
-                catch (HttpRequestException ex)
+                catch (HttpParser.HttpRequestException ex)
                 {
+                    if (ex.Message.Contains("Неожиданный конец потока"))
+                    {
+                        _logger.LogDebug("Клиент закрыл соединение во время передачи");
+                        break;
+                    }
                     _logger.LogWarning(ex, "Некорректный запрос");
-                    await HttpParser.SendResponseAsync(stream, HttpResponse.BadRequest(ex.Message), cancellationToken,
-                        false);
+                    await HttpParser.SendResponseAsync(stream, HttpResponse.BadRequest(ex.Message), cancellationToken, false);
                     break;
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    // сервер останавливается
                     break;
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Внутренняя ошибка");
-                    await HttpParser.SendResponseAsync(stream, HttpResponse.InternalServerError(), cancellationToken,
-                        false);
+                    await HttpParser.SendResponseAsync(stream, HttpResponse.InternalServerError(), cancellationToken, false);
                     break;
                 }
             }

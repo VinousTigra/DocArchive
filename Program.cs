@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
+using DocArhive.Controllers;
+using DocArhive.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -24,21 +27,38 @@ class Program
 
         var services = new ServiceCollection();
         services.AddLogging(builder => builder
-            .AddConsole()                
+            .AddConsole()
             .SetMinimumLevel(LogLevel.Information)
         );
         services.AddSingleton(options);
+        services.AddSingleton<ProjectState>();
+        services.AddSingleton<HomeController>();
+        services.AddSingleton<ArchiveController>();
+        services.AddSingleton<Router>();
         services.AddSingleton<HttpServer>();
 
         var serviceProvider = services.BuildServiceProvider();
         var server = serviceProvider.GetRequiredService<HttpServer>();
 
+        var cts = new CancellationTokenSource();
+
+        Console.CancelKeyPress += async (sender, e) =>
+        {
+            e.Cancel = true;
+            Console.WriteLine("Получен сигнал остановки. Завершаем работу...");
+            await server.StopAsync();
+            cts.Cancel();
+        };
+
         try
         {
             server.Start();
-            Console.WriteLine("Нажмите Enter для остановки сервера...");
-            Console.ReadLine();
-            await server.StopAsync();
+            Console.WriteLine("Нажмите Ctrl+C для остановки сервера...");
+            await Task.Delay(-1, cts.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            // нормальное завершение
         }
         catch (Exception ex)
         {

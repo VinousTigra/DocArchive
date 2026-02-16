@@ -1,4 +1,7 @@
 ﻿#nullable enable
+
+using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace DocArhive;
@@ -9,8 +12,9 @@ public class HttpResponse
     public string StatusMessage { get; private set; }
     public string ContentType { get; set; } = "text/html; charset=utf-8";
     public string Content { get; set; } = "";
-    public Stream? BodyStream { get; set; }          // для стриминга
-    public bool HasBody => BodyStream != null || !string.IsNullOrEmpty(Content);
+    public Stream? BodyStream { get; set; }
+    public bool? KeepAlive { get; set; } = null;
+    public Dictionary<string, string> Headers { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
     private HttpResponse(int statusCode, string statusMessage)
     {
@@ -18,9 +22,15 @@ public class HttpResponse
         StatusMessage = statusMessage;
     }
 
-    // Стандартные ответы
     public static HttpResponse Ok(string content = "", string contentType = "text/html; charset=utf-8")
         => new(200, "OK") { Content = content, ContentType = contentType };
+
+    public static HttpResponse Redirect(string location)
+    {
+        var response = new HttpResponse(302, "Found");
+        response.Headers["Location"] = location;
+        return response;
+    }
 
     public static HttpResponse BadRequest(string message = "Bad Request")
         => new(400, "Bad Request") { Content = $"<h1>400 Bad Request</h1><p>{message}</p>" };
@@ -45,6 +55,7 @@ public class HttpResponse
 
     public static HttpResponse NotImplemented()
         => new(501, "Not Implemented") { Content = "<h1>501 Not Implemented</h1>" };
-    
-    public bool KeepAlive { get; set; } = false;
+
+    public static HttpResponse Empty(int statusCode = 204, string statusMessage = "No Content")
+        => new(statusCode, statusMessage) { Content = "" };
 }

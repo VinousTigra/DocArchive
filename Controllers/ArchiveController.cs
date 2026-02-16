@@ -1,93 +1,51 @@
-﻿using System.Collections.Generic;
+﻿#nullable enable
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using DocArhive.Models;
+using Microsoft.Extensions.Logging;
 
 namespace DocArhive.Controllers;
-
-using Models;
-
 
 public class ArchiveController
 {
     private readonly ProjectState _state;
+    private readonly ILogger<ArchiveController> _logger;
 
-    public ArchiveController(ProjectState state)
+    public ArchiveController(ProjectState state, ILogger<ArchiveController> logger)
     {
         _state = state;
+        _logger = logger;
     }
 
-    public string AddDocument(Dictionary<string, string> formData)
+    public void AddDocument(Dictionary<string, List<string>> formData)
     {
-        // Валидация
-        if (!formData.ContainsKey("title") || string.IsNullOrWhiteSpace(formData["title"]) ||
-            !formData.ContainsKey("filename") || string.IsNullOrWhiteSpace(formData["filename"]))
+        string? title = GetLastValue(formData, "title");
+        string? description = GetLastValue(formData, "description");
+        string? filename = GetLastValue(formData, "filename");
+        string? category = GetLastValue(formData, "category");
+
+        _logger.LogInformation("Добавление документа: title={Title}, filename={Filename}", title, filename);
+
+        if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(filename))
         {
-            return GetErrorResponse("Название документа и имя файла обязательны для заполнения");
+            throw new ArgumentException("Название документа и имя файла обязательны для заполнения");
         }
 
-        // Создание документа
         var document = new Document(
-            formData["title"],
-            formData.TryGetValue("description", out var desc) ? desc : "",
-            formData["filename"],
-            formData.TryGetValue("category", out var cat) ? cat : "Без категории"
+            title,
+            description ?? "",
+            filename,
+            category ?? "Без категории"
         );
 
-        // Добавление в архив
         _state.AddDocument(document);
-
-        // Возвращаем HTML
-        return GetSuccessResponse(document);
+        _logger.LogInformation("Документ добавлен с ID {Id}", document.Id);
     }
 
-    private string GetErrorResponse(string message)
+    private static string? GetLastValue(Dictionary<string, List<string>> dict, string key)
     {
-        return $@"
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Ошибка</title>
-    <script>
-        // Показываем alert с ошибкой
-        alert('Ошибка: {message}');
-        // Возвращаем на главную страницу
-        window.location.href = '/';
-    </script>
-</head>
-<body>
-    <p>Если перенаправление не произошло, <a href='/'>нажмите сюда</a>.</p>
-</body>
-</html>";
-    }
-
-    private string GetSuccessResponse(Document document)
-    {
-        return $@"
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Успешно</title>
-    <script>
-        // Показываем alert с подтверждением
-        alert('Документ ""{EscapeForJavaScript(document.Title)}"" успешно добавлен!');
-     
-        // Перенаправляем на главную страницу
-        window.location.href = '/';
-    </script>
-</head>
-<body>
-    <p>Если перенаправление не произошло, <a href='/status'>нажмите сюда</a>.</p>
-</body>
-</html>";
-    }
-
-    private string EscapeForJavaScript(string text)
-    {
-        if (string.IsNullOrEmpty(text)) return "";
-        // Экранируем специальные символы для JavaScript
-        return text
-            .Replace("\\", "\\\\") // обратный слеш
-            .Replace("'", "\\'") // одинарная кавычка
-            .Replace("\"", "\\\"") // двойная кавычка
-            .Replace("\n", "\\n") // новая строка
-            .Replace("\r", "\\r"); // возврат каретки
+        return dict.TryGetValue(key, out var list) && list.Count > 0 ? list.Last() : null;
     }
 }
