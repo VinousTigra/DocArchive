@@ -1,4 +1,9 @@
-﻿using System.Net;
+﻿#nullable enable
+
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Threading.Tasks;
 using DocArhive.Controllers;
 using DocArhive.Models;
 
@@ -15,50 +20,49 @@ public class Router
         _archiveController = new ArchiveController(projectState);
     }
 
-    public HttpResponse Route(HttpRequest request)
+    public Task<HttpResponse> RouteAsync(HttpRequest request)
     {
         try
         {
             return request.Method.ToUpperInvariant() switch
             {
-                "GET" => RouteGet(request),
-                "POST" => RoutePost(request),
-                _ => HttpResponse.MethodNotAllowed()
+                "GET" => RouteGetAsync(request),
+                "POST" => RoutePostAsync(request),
+                _ => Task.FromResult(HttpResponse.MethodNotAllowed())
             };
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Ошибка маршрутизации: {ex.Message}");
-            return HttpResponse.InternalServerError("Внутренняя ошибка сервера");
+            return Task.FromResult(HttpResponse.InternalServerError("Внутренняя ошибка сервера"));
         }
     }
 
-    private HttpResponse RouteGet(HttpRequest request)
+    private Task<HttpResponse> RouteGetAsync(HttpRequest request)
     {
         return request.Path switch
         {
-            "/" => HttpResponse.Ok(_homeController.Index()),
-            "/status" => HttpResponse.Ok(_homeController.Status()),
-            _ => HttpResponse.NotFound("Страница не найдена")
+            "/" => Task.FromResult(HttpResponse.Ok(_homeController.Index())),
+            "/status" => Task.FromResult(HttpResponse.Ok(_homeController.Status())),
+            "/health" => Task.FromResult(HttpResponse.Ok("Healthy", "text/plain")),
+            _ => Task.FromResult(HttpResponse.NotFound("Страница не найдена"))
         };
     }
 
-    private HttpResponse RoutePost(HttpRequest request)
+    private Task<HttpResponse> RoutePostAsync(HttpRequest request)
     {
         if (request.Path == "/action")
         {
             var formData = ParseFormData(request.Body);
             var result = _archiveController.AddDocument(formData);
-            return HttpResponse.Ok(result);
+            return Task.FromResult(HttpResponse.Ok(result));
         }
-
-        return HttpResponse.NotFound();
+        return Task.FromResult(HttpResponse.NotFound());
     }
 
     private static Dictionary<string, string> ParseFormData(string body)
     {
         var formData = new Dictionary<string, string>();
-
         if (!string.IsNullOrEmpty(body))
         {
             var pairs = body.Split('&');
@@ -73,7 +77,6 @@ public class Router
                 }
             }
         }
-
         return formData;
     }
 }

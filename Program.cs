@@ -1,24 +1,37 @@
-﻿namespace DocArhive;
+﻿using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+namespace DocArhive;
 
 class Program
 {
     static async Task Main(string[] args)
     {
-        Console.WriteLine("Запуск...");
-
         var options = new HttpServerOptions
         {
             Port = 8080,
             IpAddress = "127.0.0.1",
             MaxConcurrentConnections = 50,
-            MaxRequestSize = 1024 * 1024,      // 1 MB
-            MaxHeaderSize = 16 * 1024,         // 16 KB
+            MaxRequestSize = 1024 * 1024,
+            MaxHeaderSize = 16 * 1024,
             MaxHeaderCount = 32,
-            ReceiveTimeoutMs = 10000,          // 10 секунд
-            SendTimeoutMs = 5000              // 5 секунд
+            ReceiveTimeoutMs = 10000,
+            SendTimeoutMs = 5000,
+            KeepAliveTimeoutMs = 15000
         };
 
-        using var server = new HttpServer(options);
+        var services = new ServiceCollection();
+        services.AddLogging(builder => builder
+            .AddConsole()                
+            .SetMinimumLevel(LogLevel.Information)
+        );
+        services.AddSingleton(options);
+        services.AddSingleton<HttpServer>();
+
+        var serviceProvider = services.BuildServiceProvider();
+        var server = serviceProvider.GetRequiredService<HttpServer>();
 
         try
         {

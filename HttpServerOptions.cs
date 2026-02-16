@@ -10,4 +10,5 @@ public class HttpServerOptions
     public int MaxHeaderCount { get; set; } = 32;
     public int ReceiveTimeoutMs { get; set; } = 5000;           // используется для таймаута чтения строк
     public int SendTimeoutMs { get; set; } = 5000;
+    public int KeepAliveTimeoutMs { get; set; } = 15000; // 15 секунд ожидания следующего запроса
 }

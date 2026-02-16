@@ -6,8 +6,8 @@ namespace DocArhive;
 
 public class HttpRequest
 {
-    public string Method { get; init; } = "";
-    public string Path { get; init; } = "";
-    public Dictionary<string, string> Headers { get; init; } = new();
-    public string Body { get; init; } = "";
+    public string Method { get; set; } = "";
+    public string Path { get; set; } = "";
+    public Dictionary<string, string> Headers { get; set; } = new();
+    public string Body { get; set; } = "";
 }
