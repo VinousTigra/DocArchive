@@ -69,11 +69,13 @@
     <a href="/status">Состояние архива</a>
 </div>
 
+{{documentsCount}}
+
 <h2>Добавить новый документ</h2>
-<form method="post" action="/action">
+<form action="/action" method="post">
     <div class="form-group">
         <label for="title">Название документа:</label>
-        <input type="text" id="title" name="title" required>
+        <input id="title" name="title" required type="text">
     </div>
 
     <div class="form-group">
@@ -83,19 +85,19 @@
 
     <div class="form-group">
         <label for="filename">Имя файла:</label>
-        <input type="text" id="filename" name="filename" required>
+        <input id="filename" name="filename" required type="text">
     </div>
 
     <div class="form-group">
         <label for="category">Категория:</label>
-        <input type="text" id="category" name="category" placeholder="Приказы, Договоры, Отчеты...">
+        <input id="category" name="category" placeholder="Приказы, Договоры, Отчеты..." type="text">
     </div>
 
-    <button type="submit" style="background-color: #538f46; font-family: ursive, cursive; color: white; padding: 12px 25px;
+    <button onmouseout="this.style.backgroundColor='#538f46'" onmouseover="this.style.backgroundColor='#d02f66'"
+            style="background-color: #538f46; font-family: ursive, cursive; color: white; padding: 12px 25px;
      border: none; border-radius: 4px; cursor: pointer; font-size: 16px; width: 325px; 
      transition: background-color 0.3s;"
-            onmouseover="this.style.backgroundColor='#d02f66'"
-            onmouseout="this.style.backgroundColor='#538f46'">
+            type="submit">
         Добавить в архив
     </button>
 

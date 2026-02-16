@@ -12,7 +12,7 @@ using System.Collections.Concurrent;
 public class ProjectState
 {
     private readonly ConcurrentDictionary<int, Document> _documents = new();
-    private int _nextId = 1;
+    private int _nextId = 0;
     
     public List<Document> Documents => [.. _documents.Values];
     public int TotalDocuments => _documents.Count;

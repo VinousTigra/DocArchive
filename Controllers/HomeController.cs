@@ -1,11 +1,10 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Text;
+using DocArhive.Models;
 
 namespace DocArhive.Controllers;
-
-using System.Text;
-using Models;
 
 public class HomeController
 {
@@ -32,7 +31,7 @@ public class HomeController
         {
             // Поднимаемся на 3 уровня вверх из bin/Debug/netX.0/
             var projectRoot = currentDir;
-            for (int i = 0; i < 3; i++)
+            for (var i = 0; i < 3; i++)
             {
                 projectRoot = Directory.GetParent(projectRoot)?.FullName;
                 if (projectRoot == null) break;
@@ -64,7 +63,14 @@ public class HomeController
 
     public string Index()
     {
-        return ReadViewFile("index.html");
+        //return ReadViewFile("index.html");
+        var template = ReadViewFile("index.html");
+        var documentsHtml = new StringBuilder();
+        documentsHtml.AppendLine("<div>");
+        documentsHtml.AppendLine($"<p> Всего документов в архиве: {_state.Documents.Count}</p>");
+        documentsHtml.AppendLine("</div>");
+
+        return template.Replace("{{documentsCount}}", documentsHtml.ToString());
     }
 
     public string Status()
@@ -100,6 +106,9 @@ public class HomeController
 
             documentsHtml.AppendLine("</tbody>");
             documentsHtml.AppendLine("</table>");
+            documentsHtml.AppendLine("<div>");
+            documentsHtml.AppendLine($"<p> Всего документов в архиве: {_state.Documents.Count}</p>");
+            documentsHtml.AppendLine("</div>");
         }
         else
         {

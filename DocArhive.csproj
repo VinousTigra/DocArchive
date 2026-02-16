@@ -9,4 +9,11 @@
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.13"/>
     </ItemGroup>
 
+    <ItemGroup>
+        <Content Include="DocArсhive.sln" />
+        <Content Include="Views\**\*.html">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+    
 </Project>

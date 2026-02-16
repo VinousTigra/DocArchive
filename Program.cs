@@ -14,9 +14,9 @@ class Program
             Port = 8080,
             IpAddress = "127.0.0.1",
             MaxConcurrentConnections = 50,
-            MaxRequestSize = 1024 * 1024,
-            MaxHeaderSize = 16 * 1024,
-            MaxHeaderCount = 32,
+            MaxRequestSize = 40 * 1024 * 1024,
+            MaxHeaderSize = 64 * 1024,
+            MaxHeaderCount = 64,
             ReceiveTimeoutMs = 10000,
             SendTimeoutMs = 5000,
             KeepAliveTimeoutMs = 15000

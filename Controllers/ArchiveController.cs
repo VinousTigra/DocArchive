@@ -1,9 +1,7 @@
 ﻿using System.Collections.Generic;
+using DocArhive.Models;
 
 namespace DocArhive.Controllers;
-
-using Models;
-
 
 public class ArchiveController
 {
@@ -19,9 +17,7 @@ public class ArchiveController
         // Валидация
         if (!formData.ContainsKey("title") || string.IsNullOrWhiteSpace(formData["title"]) ||
             !formData.ContainsKey("filename") || string.IsNullOrWhiteSpace(formData["filename"]))
-        {
             return GetErrorResponse("Название документа и имя файла обязательны для заполнения");
-        }
 
         // Создание документа
         var document = new Document(
@@ -63,18 +59,31 @@ public class ArchiveController
         return $@"
 <!DOCTYPE html>
 <html>
+
 <head>
+    <style>
+        body {{ font-family: cursive; margin: 40px; }}
+        a {{ display: inline-block; padding: 10px 20px; background: #538f46; color: white; text-decoration: none; margin: 5px; border-radius: 4px; }}
+        a:hover {{ background: #d02f66; }}
+        table {{ border-collapse: collapse; width: 100%; margin: 20px 0; }}
+        th, td {{ border: 1px solid #ddd; padding: 12px; text-align: left; }}
+        th {{ background-color: #303030; color: white; }}
+    </style>
     <title>Успешно</title>
     <script>
         // Показываем alert с подтверждением
-        alert('Документ ""{EscapeForJavaScript(document.Title)}"" успешно добавлен!');
+        //alert('Документ ""{EscapeForJavaScript(document.Title)}"" успешно добавлен!');
      
         // Перенаправляем на главную страницу
-        window.location.href = '/';
+         setTimeout(function() {{
+            window.location.href = '/status';
+        }}, 3000);    
+
     </script>
 </head>
 <body>
-    <p>Если перенаправление не произошло, <a href='/status'>нажмите сюда</a>.</p>
+    <h1>Документ успешно загружен!</h1>    
+    <p>Если перенаправление не произошло</p><a href='/status'>нажмите сюда</a>
 </body>
 </html>";
     }
